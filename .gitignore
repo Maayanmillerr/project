@@ -1,0 +1,20 @@
+# OS files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Data files (large)
+*.xlsx
+*.zip
+
+# Generated outputs
+clean_outputs/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+.venv/
