@@ -1,0 +1,111 @@
+CODEX DATA STEPS LOG
+Project: final_project
+Main working dataset: data/botcalls_merge_sheet1_codex.csv
+
+Purpose:
+Track data actions in short form so the pipeline can be reproduced.
+
+Conventions:
+- Always apply changes on: data/botcalls_merge_sheet1_codex.csv
+- Keep original source untouched: data/botcalls_merge_sheet1.csv
+- Each step includes: what changed + how to rerun.
+
+------------------------------------------------------------------
+[2026-03-04] Step 1 - Created codex working copy
+What:
+- Created a working copy of the original dataset.
+How to redo:
+- cp data/botcalls_merge_sheet1.csv data/botcalls_merge_sheet1_codex.csv
+
+[2026-03-04] Step 2 - Cleaned phone + city fields
+What:
+- Normalized phone values (digits only; 972* -> 0*).
+- Standardized city values and blanked unmatched invalid city text.
+- Output stayed in-place on the codex file.
+How to redo:
+- python3 scripts/clean_botcalls.py -i data/botcalls_merge_sheet1_codex.csv -o data/botcalls_merge_sheet1_codex.csv
+
+[2026-03-05] Step 3 - Filtered to adoption-intent route
+What:
+- Kept only rows where column 'נתיב' contains: 'סיבת הפניה אימוץ כלב'.
+How to redo:
+- python3 scripts/clean_botcalls.py -i data/botcalls_merge_sheet1_codex.csv -o data/botcalls_merge_sheet1_codex.csv --route-contains "סיבת הפניה אימוץ כלב"
+
+[2026-03-05] Step 4 - Parsed route into structured steps + funnel metrics
+What:
+- Parsed 'נתיב' into normalized route fields: num_steps, normalized_path, step_1..step_N.
+- Built funnel/drop-off summary by step.
+How to redo:
+- python3 scripts/route_funnel_analysis.py -i data/botcalls_merge_sheet1_codex.csv --parsed-output data/botcalls_merge_sheet1_codex_with_route_steps.csv --funnel-output data/botcalls_merge_sheet1_codex_funnel_steps.csv
+
+Current status snapshot:
+- data/botcalls_merge_sheet1_codex.csv has 2074 rows and 98 columns.
+- Includes route features: num_steps, normalized_path, step_1..step_51.
+
+------------------------------------------------------------------
+Update policy:
+- After every future data transformation, append one short step here:
+  date, what changed, and exact rerun command.
+
+[2026-03-05] Step 6 - Removed constant-value columns
+What:
+- Dropped columns where all rows had identical values:
+  צוות, כיוון, ממוצע סקר.
+- This reduces noise and keeps only informative features.
+How to redo:
+- python3 - <<'PY'
+import pandas as pd
+p='data/botcalls_merge_sheet1_codex.csv'
+df=pd.read_csv(p,dtype=str,encoding='utf-8-sig')
+df=df.drop(columns=[c for c in ['צוות','כיוון','ממוצע סקר'] if c in df.columns])
+df.to_csv(p,index=False,encoding='utf-8-sig')
+PY
+
+Updated status snapshot:
+- data/botcalls_merge_sheet1_codex.csv has 2074 rows and 95 columns.
+
+[2026-03-05] Step 7 - Built phone-level dataset for modeling
+What:
+- Created one row per phone number from the call-level codex file.
+- Added sum_calls and aggregated features (status/city modes, route complexity, path diversity,
+  messages/media totals, and duration summaries in seconds).
+Output:
+- data/botcalls_phone_level_codex.csv
+How to redo:
+- python3 scripts/build_phone_level_dataset.py -i data/botcalls_merge_sheet1_codex.csv -o data/botcalls_phone_level_codex.csv
+
+Updated status snapshot:
+- data/botcalls_phone_level_codex.csv has 1798 phone rows.
+- Built from 2074 filtered call rows in data/botcalls_merge_sheet1_codex.csv.
+
+[2026-03-05] Step 8 - Matched adoption report to phone-level dataset
+What:
+- Loaded adoption Excel and detected the real header row automatically.
+- Matched by phone number after phone normalization.
+- Applied dedup rule per phone: one adoption event per unique (dog name + adoption date).
+- Added labels to phone-level data: adoption_count, adopted_dogs_nunique,
+  first_adoption_date, last_adoption_date, success (1/0).
+Outputs:
+- data/botcalls_phone_level_codex.csv (updated in place)
+- data/adoptions_phone_summary_codex.csv
+How to redo:
+- python3 scripts/match_adoptions_by_phone.py --phone-level-input data/botcalls_phone_level_codex.csv --adoption-xlsx '/Users/maayanmiller/Downloads/דוח אימוצים חשבשבת 2019_2025.xlsx' --output data/botcalls_phone_level_codex.csv --adoption-summary-output data/adoptions_phone_summary_codex.csv
+
+Updated status snapshot:
+- Matched success phones: 69
+- Total matched adoption events: 71
+
+[2026-03-11] Step 9 - Enforced single codex working CSV
+What:
+- Kept one combined working file only: data/botcalls_merge_sheet1_codex.csv.
+- Promoted the latest phone-level labeled dataset (with success/adoption_count) to this path.
+- Removed redundant generated CSVs:
+  data/botcalls_phone_level_codex.csv
+  data/adoptions_phone_summary_codex.csv
+  data/btcallls_working.csv
+How to redo:
+- cp data/botcalls_phone_level_codex.csv data/botcalls_merge_sheet1_codex.csv
+- rm -f data/botcalls_phone_level_codex.csv data/adoptions_phone_summary_codex.csv data/btcallls_working.csv
+
+Updated status snapshot:
+- data/botcalls_merge_sheet1_codex.csv is the only codex working CSV.
